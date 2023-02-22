@@ -18,25 +18,6 @@ try:
     from plexapi.library import ShowSection
     from plexapi.collection import Collection
     from plexapi.exceptions import NotFound
-    # from plex_tools import get_map
-    # from plex_tools import add_to_collection
-    # from plex_tools import delete_collection
-    # from plex_tools import get_actor_rkey
-    # from plex_tools import get_collection
-    # from plex_tools import get_item
-    # from imdb_tools import tmdb_get_metadata
-    # from imdb_tools import imdb_get_ids
-    # from config_tools import Config
-    # from config_tools import Plex
-    # from config_tools import Radarr
-    # from config_tools import TMDB
-    # from config_tools import Tautulli
-    # from config_tools import TraktClient
-    # from config_tools import ImageServer
-    # from config_tools import modify_config
-    # from config_tools import check_for_attribute
-    # from radarr_tools import add_to_radarr
-    # from urllib.parse import urlparse
 except ModuleNotFoundError:
     print('Requirements Error: Please install requirements using "pip install -r requirements.txt"')
     sys.exit(0)
@@ -54,6 +35,11 @@ parser.add_argument("-l", "--library",
                     dest="library",
                     help="name of the Plex library to update",
                     default="")
+parser.add_argument("-c", "--collection-priority", "--collection_priority",
+                    dest="collection_priority",
+                    help="put all collections at the top of the sort order",
+                    action='store_true',
+                    default=False)
 parser.add_argument("-v", "--verbose",
                     help="verbose logging",
                     action='store_true',
@@ -138,52 +124,58 @@ def update_plex_movie_library(server, section, roots):
     """
     Updates all collections and posters for the specified movie library section
     """
-    
-    # split all merged media before building map
-    print(f"searching for merged movies that should be split for section '{section.title}'...")
+
+    # maps media disk paths to Plex movies
+    plex_media_dir_to_movie = {}
+
+    # first, split all media Plex has auto-merged. We'll re-merge directory-adjacent media later, but doing the split upfront greatly simplifies things
+    print(f"splitting all Plex auto-merged media in '{section.title}'...")
     for movie in section.all():
         if len(movie.locations) > 1:
-            if args.verbose:
-                print(f"splitting merged movie entry {movie.title} into {str(len(movie.locations))} independent movie entries:")
-                for location in movie.locations:
-                    print(f"    * {location}")
+            print(f"splitting merged movie entry '{movie.title}' into {str(len(movie.locations))} independent movie entries:")
+            for location in movie.locations:
+                print(f"    * {location}")
             movie.split()
 
-    # map media directories to their Plex movie entry(s) - multiple entries with the same directory will be merged
-    plex_basedir_to_movie = {}
+    # map media directories to their Plex movie entry(s) - at this stage, there may be multiple movie entries with their media files in the same directory
     for movie in section.all():
-        if len(movie.locations) != 1:
-            # if this occurs, we have merged media even after the split step above, or we have an entry with no associated file locations! Skip
-            print(f"Warning: movie '{movie.title}' still contains an unexpected number of media files after split step: {str(len(movie.locations))}")
-            continue
-        basedir, tail = ntpath.split(movie.locations[0])
-        if not tail:
-            basedir, tail = ntpath.split(basedir)
-        if basedir not in plex_basedir_to_movie:
-            plex_basedir_to_movie[basedir] = []
-        plex_basedir_to_movie[basedir].append(movie)
-    
-    # merge any movie entries that share the same basedir. Flatten map from one-to-many to one-to-one
-    print(f"merging movie entries with identical media directories...")
-    for basedir in plex_basedir_to_movie:
-        if len(plex_basedir_to_movie[basedir]) > 1:
-            base_movie = plex_basedir_to_movie[basedir][0]
-            ratingkeys_to_merge = []
-            for i in range(1, len(plex_basedir_to_movie[basedir])):
-                ratingkeys_to_merge.append(str(plex_basedir_to_movie[basedir][i].ratingKey))
+        if len(movie.locations) > 0:
+            basedir, tail = ntpath.split(movie.locations[0])
+            if not tail:
+                basedir, tail = ntpath.split(basedir)
+            if basedir not in plex_media_dir_to_movie:
+                plex_media_dir_to_movie[basedir] = []
+            plex_media_dir_to_movie[basedir].append(movie)
             if args.verbose:
-                print(f"Found {str(len(plex_basedir_to_movie[basedir]))} media files under base directory {basedir}. Merging into a single movie entry")
+                print(f"mapped '{movie.title}' to directory '{basedir}'")
+    
+    # merge movies with directory-adjacent media files into the same movie entry. Flatten map from one-to-many to one-to-one
+    print(f"merging movie entries with identical media directories...")
+    for basedir in plex_media_dir_to_movie:
+        if len(plex_media_dir_to_movie[basedir]) > 1:
+            base_movie = plex_media_dir_to_movie[basedir][0]
+            ratingkeys_to_merge = []
+            for i in range(1, len(plex_media_dir_to_movie[basedir])):
+                ratingkeys_to_merge.append(str(plex_media_dir_to_movie[basedir][i].ratingKey))
+            print(f"Found {str(len(plex_media_dir_to_movie[basedir]))} media files under base directory {basedir}. Merging into a single movie entry")
             base_movie.merge(ratingkeys_to_merge)
         
-        # flatten mapping, taking first movie entry (the sole movie, or the base movie used when merging)
-        base_movie = plex_basedir_to_movie[basedir][0]
-        plex_basedir_to_movie[basedir] = base_movie
+        # flatten mapping, merging all other media files into the first and creating a single movie entry
+        base_movie = plex_media_dir_to_movie[basedir][0]
+        plex_media_dir_to_movie[basedir] = base_movie
 
     # iterate our entry trees and build collections + assign metadata
     for root in roots:
         for entry in root.sub_entries:
 
-            # process movie collection entry
+            # if this entry is mapped, apply artwork
+            if entry.path in plex_media_dir_to_movie:
+                if entry.artwork:
+                    movie = plex_media_dir_to_movie[entry.path]
+                    movie.uploadPoster(url=None, filepath=entry.artwork)
+                    print(f"applied artwork '{entry.artwork}' to poster for movie '{movie.title}'")
+
+            # evaluate the sub-entries of this entry, if any
             if len(entry.sub_entries) > 0:
 
                 # recursively locate all sub-entries from the root 
@@ -191,46 +183,41 @@ def update_plex_movie_library(server, section, roots):
                     entries = []
                     for sub_entry in entry.sub_entries:
                         entries = entries + find_mapped_entries_recursive(sub_entry, False)
-                    if not is_root:
-                        if entry.path in plex_basedir_to_movie:
-                            entries.append(entry)
+                    if entry.path in plex_media_dir_to_movie and not is_root:
+                        entries.append(entry)
                     return entries
-                entries_for_collection = find_mapped_entries_recursive(entry)
+                mapped_entries = find_mapped_entries_recursive(entry)
 
-                # add all mapped items to collection
-                items_for_collection = [plex_basedir_to_movie[i.path] for i in entries_for_collection]
-                collection = None
-                try:
-                    collection = section.collection(entry.name)
-                    collection.addItems(items_for_collection)
-                except NotFound:
-                    collection = section.createCollection(entry.name, items_for_collection)
+                # if a top-level entry has any mapped sub-entries (at any depth), build a collection
+                if len(mapped_entries) > 0:
 
-                # add artwork to all sub-entries in collection
-                for sub_entry in entries_for_collection:
-                    if sub_entry.artwork:
-                        movie = plex_basedir_to_movie[sub_entry.path]
-                        movie.uploadPoster(url=None, filepath=sub_entry.artwork)
-                        print(f"applied artwork '{sub_entry.artwork}' to poster for movie '{movie.title}'")
+                    # add all mapped items to collection
+                    print(f"creating collection '{entry.name}'")
+                    items_for_collection = [plex_media_dir_to_movie[i.path] for i in mapped_entries]
+                    collection = None
+                    try:
+                        collection = section.collection(entry.name)
+                        collection.addItems(items_for_collection)
+                    except NotFound:
+                        collection = section.createCollection(entry.name, items_for_collection)
 
-                # add collection artwork if provided
-                if entry.artwork:
-                    collection.uploadPoster(url=None, filepath=entry.artwork)
-                    print(f"applied artwork '{entry.artwork}' to poster for collection '{collection.title}'")
+                    # add artwork to all sub-entries in collection
+                    for sub_entry in mapped_entries:
+                        if sub_entry.artwork:
+                            movie = plex_media_dir_to_movie[sub_entry.path]
+                            movie.uploadPoster(url=None, filepath=sub_entry.artwork)
+                            print(f"applied artwork '{sub_entry.artwork}' to poster for movie '{movie.title}'")
 
-            # process movie entry
-            else:
-                if entry.artwork:
-                    if entry.path in plex_basedir_to_movie:
-                        movie = plex_basedir_to_movie[entry.path]
-                        movie.uploadPoster(url=None, filepath=entry.artwork)
-                        print(f"applied artwork '{entry.artwork}' to poster for movie '{movie.title}'")
+                    # add collection artwork if provided
+                    if entry.artwork:
+                        collection.uploadPoster(url=None, filepath=entry.artwork)
+                        print(f"applied artwork '{entry.artwork}' to poster for collection '{collection.title}'")
 
     # dump tree state if logging is set to verbose
     if args.verbose:
         for root in roots:
             print(f"==========|{root.path}|==========")
-            root.print([plex_basedir_to_movie])
+            root.print([plex_media_dir_to_movie])
 
 
 def update_plex_show_library(server, section, roots):
@@ -238,62 +225,167 @@ def update_plex_show_library(server, section, roots):
     Updates all collections and posters for the specified show library section
     """
 
-    # map disk paths to Plex shows
-    plex_basedir_to_show = {}
+    # map media disk paths to Plex shows
+    plex_media_dir_to_show = {}
 
-    # map disk paths to Plex show seasons
-    plex_basedir_to_season = {}
+    # map media disk paths to Plex show seasons
+    plex_media_dir_to_season = {}
+
+    # first, split all media Plex has auto-merged. We'll re-merge directory-adjacent media later, but doing the split upfront greatly simplifies things
+    print(f"splitting all Plex auto-merged media in '{section.title}'...")
+    for show in section.all():
+
+        # any episode with multiple media locations implies a show with merged media
+        def contains_merged_content(show):
+            for season in show.seasons():
+                for episode in season.episodes():
+                    if len(episode.locations) > 1:
+                        return True
+            return False
+
+        # split all merged media
+        if contains_merged_content(show):
+            print(f"splitting merged show entry '{show.title}' into independent show entries")
+            show.split()
+
+    # container for tracking all the different unique media directories for each season's episodes. We need this data to check against show/season directory ambiguity
+    class Show:
+        def __init__(self, show):
+            self.show = show
+            self.unique_season_media_locations = {}     # maps the show's season number to a list of the unique media directories referenced by the season's episodes
 
     # scan for media and attempt to correlate it to show / season base directories
     for show in section.all():
-        show_basedir = None
+        s = Show(show)
         for season in show.seasons():
-            season_base_dirs = []
+
+            # build a list of all unique directories that media in this season is located in (if this list's length == 1, we know all its media is in one directory)
+            s.unique_season_media_locations[season.seasonNumber] = []
             for episode in season.episodes():
                 for location in episode.locations:
                     basedir, tail = ntpath.split(location)
                     if not tail:
                         basedir, tail = ntpath.split(basedir)
-                    if basedir not in season_base_dirs:
-                        season_base_dirs.append(basedir)
+                    if basedir not in s.unique_season_media_locations[season.seasonNumber]:
+                        s.unique_season_media_locations[season.seasonNumber].append(basedir)
             
-            # multiple seasons point to the same directory. Don't apply any artwork or metadata to seasons with base directory ambiguity.
-            if len(season_base_dirs) != 1:
+            # season has media files across multiple directories. Don't apply any artwork or metadata to seasons with base directory ambiguity.
+            if len(s.unique_season_media_locations[season.seasonNumber]) > 1:
                 print(f"Warning: Season {season.seasonNumber} of '{show.title}' is ambiguous (media files across multiple directories). Skipping.")
-                if args.verbose:
-                    print(f"    Located {str(len(season_base_dirs))} media directories")
-                    for dir in season_base_dirs:
-                        print(f"    * {dir}")
-                continue
-
-            # a season has media in multiple directories. Don't apply any artwork or metadata to seasons with base directory ambiguity.
-            if season_base_dirs[0] in plex_basedir_to_season:
-                print(f"Warning: Season {season.seasonNumber} of '{show.title}' is ambiguous (multiple seasons have media files in this directory). Skipping")
-                if args.verbose:
-                    print(f"    Season {str(plex_basedir_to_season[season_base_dirs[0]].seasonNumber)} of '{show.title}' also has media files in this directory! Skipping")
-                del plex_basedir_to_season[season_base_dirs[0]]
+                print(f"    Located {str(len(s.unique_season_media_locations[season.seasonNumber]))} media directories:")
+                for location in s.unique_season_media_locations[season.seasonNumber]:
+                    print(f"        * {location}")
                 continue
             
-            # at least one season passed ambiguity checks, so we can make an assumption about the show's base directory as well
-            plex_basedir_to_season[season_base_dirs[0]] = season
-            show_basedir, tail = ntpath.split(season_base_dirs[0])
-            if not tail:
-                show_basedir, tail = ntpath.split(show_basedir)
-        
-        if show_basedir:
-            if show_basedir in plex_basedir_to_show:
-                print(f"Warning: '{show.title}' and '{plex_basedir_to_show[show_basedir].title}' are ambiguous (both shows have media files in the same directory). Skipping")
-                del plex_basedir_to_show[show_basedir]
+            # as far as I know, this is impossible... but if we really have no media files associated with a season, ignore it
+            elif len(s.unique_season_media_locations[season.seasonNumber]) < 1:
+                print(f"Warning: Season {season.seasonNumber} of '{show.title}' has no media associated with it. Skipping.")
                 continue
-            plex_basedir_to_show[show_basedir] = show
 
+            else:
+                # all this season's media is in the same directory. Store in our one-to-many map so we can ensure no other seasons also have media in this directory
+                season_media_directory = s.unique_season_media_locations[season.seasonNumber][0]
+                if season_media_directory not in plex_media_dir_to_season:
+                    plex_media_dir_to_season[season_media_directory] = []
+                plex_media_dir_to_season[season_media_directory].append(season)
+                if args.verbose:
+                    print(f"mapped season {str(season.seasonNumber)} of '{show.title}' to directory '{season_media_directory}'")
+            
+        # finally, we only map a show to a directory if all the season base directories agree on a common top leave "show" directory
+        show_roots = []
+        for season in show.seasons():
+            for location in s.unique_season_media_locations[season.seasonNumber]:
+                basedir, tail = ntpath.split(location)
+                if not tail:
+                    basedir, tail = ntpath.split(basedir)
+                if basedir not in show_roots:
+                    show_roots.append(basedir)
+        
+        # if the seasons all agree, we now map the show's media directory to the show in one-to-many so we can identify other shows with the same media directories later
+        if len(show_roots) == 1:
+            if show_roots[0] not in plex_media_dir_to_show:
+                plex_media_dir_to_show[show_roots[0]] = []
+            plex_media_dir_to_show[show_roots[0]].append(s)
+            if args.verbose:
+                    print(f"mapped the root directory of show '{show.title}' to directory '{show_roots[0]}'")
+        else:
+            print(f"Warning: show directory extrapolated from media locations for '{show.title}' is ambiguous (show's media organization suggests multiple possible root show directories). Skipping.")
+            print(f"    Found {str(len(show_roots))} possible root directories:")
+            for root in show_roots:
+                print(f"        * {root}")
+
+    # merge or strip ambiguous shows from mapping, flattening map to one-to-one
+    for media_dir in plex_media_dir_to_show:
+        if len(plex_media_dir_to_show[media_dir]) > 1:
+            ambiguous_shows = plex_media_dir_to_show[media_dir]
+
+            # returns True as long as all shows in "shows" have identical media locations for any seasons they have media for
+            def should_merge_shows(shows):
+                base_show = shows[0]
+                for season in base_show.show.seasons():
+                    for i in range(1, len(shows)):
+                        if len(base_show.unique_season_media_locations) > 0 and len(shows[i].unique_season_media_locations) > 0:
+                            if base_show.unique_season_media_locations[season.seasonNumber] != shows[i].unique_season_media_locations[season.seasonNumber]:
+                                return False
+
+            # since all these shows map to the same directory, we either merge them (all media directories match) or they're all marked ambiguous and rejected
+            if should_merge_shows(ambiguous_shows):
+
+                # before actually merging, we need to make sure to reconcile this change in the season map, so seasons aren't falsely marked as ambiguous
+                for season in ambiguous_shows[0].seasons():
+
+                    # seasons that don't meet this criteria are never even mapped, so we only care about seasons with a single media location
+                    if len(ambiguous_shows[0].unique_season_media_locations) == 1:
+                        season_media_location = ambiguous_shows[0].unique_season_media_locations[0]
+                        mapped_seasons = plex_media_dir_to_season[season_media_location]
+                        
+                        # flatten if all the entries in the seasons map are from this now merged show
+                        if len(plex_media_dir_to_season[season_media_location]) == len(ambiguous_shows):
+                            base_season = plex_media_dir_to_season[season_media_location][0]
+                            plex_media_dir_to_season[season_media_location] = base_season
+                        
+                        else:
+                            # if all the mapped seasons aren't accounted for by this merged show, the season mapping is guaranteed to be ambiguous. remove the mapping
+                            del plex_media_dir_to_season[season_media_location]
+
+                # merge these shows
+                ratingkeys_to_merge = []
+                for i in range(1, len(ambiguous_shows)):
+                    s = ambiguous_shows[i]
+                    ratingkeys_to_merge.append(s.show.seasons()[0].parentRatingKey)     # not sure why the PlexAPI has parentRatingKeys on seasons, but no exposed ratingKey on the show itself?? 
+                ambiguous_shows[0].show.merge()
+            
+            else:
+                # if we aren't merging these shows, they're ambiguous - remove from mapping
+                print(f"Warning: '{plex_media_dir_to_show[media_dir][0].show.title}' is ambiguous (More than one show was mapped to this directory). Skipping")
+                print(f"    Found {str(len(plex_media_dir_to_show[media_dir]))} other show(s) mapped to '{media_dir}':")
+                for s in plex_media_dir_to_show[media_dir]:
+                    print(f"        * '{s.show.title}'")
+                del plex_media_dir_to_show[media_dir]
+                continue
+        
+        # flatten mapping - if we got here, we either merged down to one show, or there was only one show in this mapping pair to begin with
+        base_show = plex_media_dir_to_show[media_dir][0]
+        plex_media_dir_to_show[media_dir] = base_show.show
+
+    # strip ambiguous seasons from mapping, flattening map to one-to-one
+    for media_dir in plex_media_dir_to_season:
+        if len(plex_media_dir_to_season[media_dir]) > 1:
+            print(f"Warning: season {str(plex_media_dir_to_season[media_dir][0].seasonNumber)} of '{plex_media_dir_to_season[media_dir][0].parentTitle}' mapped to '{media_dir}' is ambiguous (other seasons mapped to the same directory). Skipping")
+            print(f"    Found {str(len(plex_media_dir_to_season[media_dir]))} other season(s) with media mapped to '{media_dir}':")
+            for season in plex_media_dir_to_season[media_dir]:
+                print(f"        * season {str(season.seasonNumber)} of '{season.parentTitle}'")
+            del plex_media_dir_to_season[season]
+        else:
+            base_season = plex_media_dir_to_season[media_dir][0]
+            plex_media_dir_to_season[media_dir] = base_season
 
     # iterate our entry trees and build collections + assign metadata
     for root in roots:
         for entry in root.sub_entries:
 
-            # process show collection entry
-            if entry.path not in plex_basedir_to_show:
+            # if we have sub-entries, we need to check if any are mapped as shows. Mapped show sub-entries mean this should be treated as a collection
+            if len(entry.sub_entries) > 0:
 
                 # recursively locate all show and season sub-entries from the root 
                 def find_mapped_entries_recursive(entry, plex_map, is_root=True):
@@ -304,54 +396,75 @@ def update_plex_show_library(server, section, roots):
                         if entry.path in plex_map:
                             entries.append(entry)
                     return entries
-                show_entries = find_mapped_entries_recursive(entry, plex_basedir_to_show)
-                season_entries = find_mapped_entries_recursive(entry, plex_basedir_to_season)
+                show_entries = find_mapped_entries_recursive(entry, plex_media_dir_to_show)
+                season_entries = find_mapped_entries_recursive(entry, plex_media_dir_to_season)
                 
                 # map and store show entries as an item list for adding to the collection
-                items_for_collection = [plex_basedir_to_show[i.path] for i in show_entries]
+                items_for_collection = [plex_media_dir_to_show[i.path] for i in show_entries]
 
-                # add all mapped items to collection
-                collection = None
-                try:
-                    collection = section.collection(entry.name)
-                    collection.addItems(items_for_collection)
-                except NotFound:
-                    collection = section.createCollection(entry.name, items_for_collection)
+                # treat this as a collection
+                if len(items_for_collection) > 0:
 
-                # add artwork to all mapped shows in collection
-                for sub_entry in show_entries:
-                    if sub_entry.artwork:
-                        show = plex_basedir_to_show[sub_entry.path]
-                        show.uploadPoster(url=None, filepath=sub_entry.artwork)
-                        print(f"applied artwork '{sub_entry.artwork}' to poster for show '{show.title}'")
+                    # add all mapped items to collection
+                    print(f"creating collection '{entry.name}'")
+                    collection = None
+                    try:
+                        collection = section.collection(entry.name)
+                        collection.addItems(items_for_collection)
+                    except NotFound:
+                        collection = section.createCollection(entry.name, items_for_collection)
+
+                    # add artwork to all mapped shows in collection
+                    for sub_entry in show_entries:
+                        if sub_entry.artwork:
+                            show = plex_media_dir_to_show[sub_entry.path]
+                            show.uploadPoster(url=None, filepath=sub_entry.artwork)
+                            print(f"applied artwork '{sub_entry.artwork}' to poster for show '{show.title}'")
+                    
+                    # add artwork to all mapped seasons of all mapped shows in collection
+                    for sub_entry in season_entries:
+                        if sub_entry.artwork:
+                            season = plex_media_dir_to_season[sub_entry.path]
+                            season.uploadPoster(url=None, filepath=sub_entry.artwork)
+                            print(f"applied artwork '{sub_entry.artwork}' to poster for season {season.seasonNumber} of show '{season.parentTitle}'")
+
+                    # add collection artwork if provided
+                    if entry.artwork:
+                        collection.uploadPoster(url=None, filepath=entry.artwork)
+                        print(f"applied artwork '{entry.artwork}' to poster for collection '{collection.title}'")
                 
-                # add artwork to all mapped seasons of all mapped shows in collection
-                for sub_entry in season_entries:
-                    if sub_entry.artwork:
-                        season = plex_basedir_to_season[sub_entry.path]
-                        season.uploadPoster(url=None, filepath=sub_entry.artwork)
-                        print(f"applied artwork '{sub_entry.artwork}' to poster for season {season.seasonNumber} of show '{season.parentTitle}'")
+                # if none of the sub-entries are mapped shows, but this directory is mapped, treat this like a show entry
+                elif entry.path in plex_media_dir_to_show:
 
-                # add collection artwork if provided
-                if entry.artwork:
-                    collection.uploadPoster(url=None, filepath=entry.artwork)
-                    print(f"applied artwork '{entry.artwork}' to poster for collection '{collection.title}'")
+                    # show artwork
+                    if entry.artwork:
+                        show = plex_media_dir_to_show[entry.path]
+                        show.uploadPoster(url=None, filepath=entry.artwork)
+                        print(f"applied artwork '{entry.artwork}' to poster for show '{show.title}'")
+                
+                    # seasons artwork
+                    for sub_entry in entry.sub_entries:
+                        if sub_entry.artwork:
+                            if sub_entry.path in plex_media_dir_to_season:
+                                season = plex_media_dir_to_season[sub_entry.path]
+                                season.uploadPoster(url=None, filepath=sub_entry.artwork)
+                                print(f"applied artwork '{sub_entry.artwork}' to poster for show '{season.title}'")
 
             # process show entry
             else:
 
                 # show artwork
                 if entry.artwork:
-                    if entry.path in plex_basedir_to_show:
-                        show = plex_basedir_to_show[entry.path]
+                    if entry.path in plex_media_dir_to_show:
+                        show = plex_media_dir_to_show[entry.path]
                         show.uploadPoster(url=None, filepath=entry.artwork)
                         print(f"applied artwork '{entry.artwork}' to poster for show '{show.title}'")
                 
                 # seasons artwork
                 for sub_entry in entry.sub_entries:
                     if sub_entry.artwork:
-                        if sub_entry.path in plex_basedir_to_season:
-                            season = plex_basedir_to_season[sub_entry.path]
+                        if sub_entry.path in plex_media_dir_to_season:
+                            season = plex_media_dir_to_season[sub_entry.path]
                             season.uploadPoster(url=None, filepath=sub_entry.artwork)
                             print(f"applied artwork '{sub_entry.artwork}' to poster for show '{season.title}'")
 
@@ -359,8 +472,8 @@ def update_plex_show_library(server, section, roots):
     if args.verbose:
         for root in roots:
             print(f"==========|{root.path}|==========")
-            root.print([plex_basedir_to_show, plex_basedir_to_season])
-    
+            root.print([plex_media_dir_to_show, plex_media_dir_to_season])
+
 
 def update_plex_video_library(server, section, roots):
     pass
@@ -383,6 +496,12 @@ elif section.type == "show":
     update_plex_show_library(server, section, roots)
 else:
     print(f"Error: attempted to update an unsupported section type '{section.type}'")
+
+# update collection sort order, if specified
+if args.collection_priority:
+    print("updating sort titles to prioritize collections")
+    for collection in section.collections():
+        collection.editSortTitle(f"_{collection.title}")
 
 
 
