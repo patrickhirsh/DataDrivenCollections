@@ -17,8 +17,12 @@ Data Driven Collections uses a simple set of rules to interpret how to translate
     * A poster art file placed inside this folder will be applied to the movie's poster in Plex.
     * Multiple movie files in a folder are treated as different versions of the same movie (eg. Theatrical, Extended, Directors Cut..).
 * A folder with nested movie folders is treated as a collection.
-    * The collection name is based off the name of the top-level folder
-    * a poster art file placed inside this top level folder will be applied to the collection's poster
+    * The collection name is based off the name of the top-level folder.
+    * A poster art file placed inside this top level folder will be applied to the collection's poster.
+* A TV Show folder should have folders for each season inside - each containing all the media files for the season.
+   * A poster artwork file in the show's root folder will get applied to the show's main poster.
+   * A poster artwork file in a show's season folder will be applied to the poster for that show's season.
+   * TV Shows can be nested inside a folder to create collections in the same way as Movies.
 
 *if any media is organized in a way that conflicts with these rules, or is otherwise ambiguous, it's simply ignored.*
 
