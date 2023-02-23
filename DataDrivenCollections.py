@@ -1,5 +1,4 @@
-# Data Driven Collections - A Plex tools
-
+# Data Driven Collections - Patrick Hirsh (February 2023)
 try:
     import os
     import ntpath
@@ -218,7 +217,7 @@ def update_plex_movie_library(server, section, roots):
     plex_media_dir_to_movie = {}
 
     # first, split all media Plex has auto-merged. We'll re-merge directory-adjacent media later, but doing the split upfront greatly simplifies things
-    print(f"splitting all Plex auto-merged media in '{section.title}'...")
+    print(f"========== splitting all Plex auto-merged media in '{section.title}' ==========")
     for movie in section.all():
         if len(movie.locations) > 1:
             print(f"splitting merged movie entry '{movie.title}' into {str(len(movie.locations))} independent movie entries:")
@@ -253,7 +252,9 @@ def update_plex_movie_library(server, section, roots):
         base_movie = plex_media_dir_to_movie[basedir][0]
         plex_media_dir_to_movie[basedir] = base_movie
 
+
     # iterate our entry trees and build collections + assign metadata
+    print("========== applying artwork and building collections ==========")
     for root in roots:
         for entry in root.sub_entries:
 
@@ -321,7 +322,7 @@ def update_plex_show_library(server, section, roots):
     plex_media_dir_to_season = {}
 
     # first, split all media Plex has auto-merged. We'll re-merge directory-adjacent media later, but doing the split upfront greatly simplifies things
-    print(f"splitting all Plex auto-merged media in '{section.title}'...")
+    print(f"========== splitting all Plex auto-merged media in '{section.title}' ==========")
     for show in section.all():
 
         # any episode with multiple media locations implies a show with merged media
@@ -470,6 +471,7 @@ def update_plex_show_library(server, section, roots):
             plex_media_dir_to_season[media_dir] = base_season
 
     # iterate our entry trees and build collections + assign metadata
+    print("========== applying artwork and building collections ==========")
     for root in roots:
         for entry in root.sub_entries:
 
@@ -563,11 +565,6 @@ def update_plex_show_library(server, section, roots):
             print(f"==========|{root.path}|==========")
             root.print([plex_media_dir_to_show, plex_media_dir_to_season])
 
-
-def update_plex_video_library(server, section, roots):
-    # TODO: support this media category
-    pass
-
 # connect to plex and gather lib info
 section = server.library.section(args.library)
 
@@ -590,6 +587,8 @@ if args.collection_priority:
     print("updating sort titles to prioritize collections")
     for collection in section.collections():
         collection.editSortTitle(f"_{collection.title}")
+        
+print("Done.")
 
 
 
