@@ -9,7 +9,9 @@ try:
     import threading
     import glob
     import datetime
+    import configparser
     from plexapi.server import PlexServer
+    from plexapi.myplex import MyPlexAccount
     from plexapi.video import Movie
     from plexapi.video import Show
     from plexapi.media import BaseResource
@@ -22,18 +24,38 @@ except ModuleNotFoundError:
     print('Requirements Error: Please install requirements using "pip install -r requirements.txt"')
     sys.exit(0)
 
-# CREDENTIALS
-PLEX_BASE_URL = "http://192.168.1.176:32400"
-PLEX_API_TOKEN = "xxxxxxxxxxxxxxxxxxxx"
-
-# CONFIG
-ARTWORK_FILENAME = "artwork"
+# Plex default supported media containers - used to match media when scanning directories
 VIDEO_MEDIA_CONTAINERS = ["asf", "avi", "mov", "mp4", "mpeg", "mpegts", "mkv", "wmv"]
 
+# read args
 parser = argparse.ArgumentParser()
 parser.add_argument("-l", "--library",
                     dest="library",
                     help="name of the Plex library to update",
+                    default="")
+parser.add_argument("-u", "--user", "--username",
+                    dest="user",
+                    help="Plex username, used for authentication when communicating with the Plex API",
+                    default="")
+parser.add_argument("-p", "--pass", "--password",
+                    dest="password",
+                    help="Plex password, used for authentication when communicating with the Plex API",
+                    default="")
+parser.add_argument("-t", "--token",
+                    dest="token",
+                    help="Plex API token 'X-Plex-Token', used as an alternate auth method to basic auth (user and password)",
+                    default="")
+parser.add_argument("-s", "--server-url," "--server_url",
+                    dest="server_url",
+                    help="Plex server url, needed for token auth",
+                    default="")
+parser.add_argument("-n", "--server-name," "--server_name",
+                    dest="server_name",
+                    help="Plex server name, needed for basic (username/password) auth",
+                    default="")
+parser.add_argument("-a", "--artwork-filename", "--artwork_filename",
+                    dest="artwork",
+                    help="filename to match when looking for poster artwork adjacent to Plex media",
                     default="")
 parser.add_argument("-c", "--collection-priority", "--collection_priority",
                     dest="collection_priority",
@@ -44,10 +66,77 @@ parser.add_argument("-v", "--verbose",
                     help="verbose logging",
                     action='store_true',
                     default=False)
-
 args = parser.parse_args()
 if args.library == "":
     print("Error: please provide a valid Plex library name")
+    exit(1)
+
+# read config data - command line takes priority over .ini
+config = configparser.ConfigParser()
+config.read("DataDrivenCollections.ini")
+
+# [Auth]
+username = None
+if "username" in config["Auth"]:
+    username = config["Auth"]["username"]
+if args.user != "":
+    username = args.user
+
+password = None
+if "password" in config["Auth"]:
+    password = config["Auth"]["password"]
+if args.password != "":
+    password = args.password
+
+token = None
+if "token" in config["Auth"]:
+    token = config["Auth"]["token"]
+if args.token != "":
+    token = args.token
+
+server_url = None
+if "server_url" in config["Auth"]:
+    server_url =  config["Auth"]["server_url"]
+if args.server_url != "":
+    server_url = args.server_url
+
+server_name = None
+if "server_name" in config["Auth"]:
+    server_name =  config["Auth"]["server_name"]
+if args.server_name != "":
+    server_name = args.server_name
+
+# [Config]
+artwork_filename = "artwork"
+if "artwork" in config["Config"]:
+    artwork_filename = config["Config"]["artwork"]
+if args.artwork != "":
+    artwork_filename = args.artwork
+
+collection_priority = "collection_priority"
+if "collection_priority" in config["Config"]:
+    if config["Config"]["collection_priority"] == "1":
+        collection_priority = True
+if args.collection_priority:
+    collection_priority = True
+
+# connect to Plex
+server = None
+if token:
+    if not server_url:
+        print("Error: must provide a Plex server url 'server_url' to use token authentication")
+        exit(1)
+    server = PlexServer(server_url, token)
+
+elif username and password:
+    if not server_name:
+        print("Error: must provide a Plex server name 'server_name' to use basic authentication (authorizing with username/password)")
+        exit(1)
+    account = MyPlexAccount(username, password)
+    server = account.resource(server_name).connect()
+
+else:
+    print("Error: please provide a form of Plex server authentication (username/password, or Plex API token)")
     exit(1)
 
 
@@ -106,7 +195,7 @@ def build_entry_tree(path, depth=0):
     for entry_element in os.listdir(entry.path):
 
         # look for entry artwork
-        if os.path.isfile(os.path.join(entry.path, entry_element)) and entry_element.split('.')[0].lower() == ARTWORK_FILENAME.lower():
+        if os.path.isfile(os.path.join(entry.path, entry_element)) and entry_element.split('.')[0].lower() == artwork_filename.lower():
             entry.artwork = os.path.join(entry.path, entry_element)
         
         # look for entry media
@@ -476,11 +565,10 @@ def update_plex_show_library(server, section, roots):
 
 
 def update_plex_video_library(server, section, roots):
+    # TODO: support this media category
     pass
 
-
 # connect to plex and gather lib info
-server = PlexServer(PLEX_BASE_URL, PLEX_API_TOKEN)
 section = server.library.section(args.library)
 
 # construct an entry tree for each physical disk location that makes up the section
