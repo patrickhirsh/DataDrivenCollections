@@ -26,7 +26,7 @@ Data Driven Collections uses a simple set of rules to interpret how to translate
 
 *if any media is organized in a way that conflicts with these rules, or is otherwise ambiguous, it's simply ignored.*
 
-#### Example:
+### Example:
 
 ```
 The Hateful Eight
@@ -49,7 +49,7 @@ Would produce a collection called "Tarantino's Best Movies" with "Inglorious Bas
 
 Finally, "Inglorious Basterds" would have two versions available in Plex under the "Play Version" option, one for "InglouriousBasterds.mp4" and one for "InglouriousBasterds_MoreItalian.mp4", which presumably includes extended scenes of Brad Pitt trying to speak Italian.
 
-#### TV Show Example:
+### TV Show Example:
 ```
 Avatar The Last Airbender
     artwork.png
