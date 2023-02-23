@@ -49,10 +49,6 @@ Would produce a collection called "Tarantino's Best Movies" with "Inglorious Bas
 
 Finally, "Inglorious Basterds" would have two versions available in Plex under the "Play Version" option, one for "InglouriousBasterds.mp4" and one for "InglouriousBasterds_MoreItalian.mp4", which presumably includes extended scenes of Brad Pitt trying to speak Italian.
 
-**TV Shows** are handled identically to Movies - except the tool expects to find sub-folders for each season inside the show's root folder. A poster artwork file at the show's root will get applied to the show's main poster, while a poster artwork file in a show's season folder will be applied to the poster for that show's season. 
-
-While *technically* TV Show collections are supported in the same way as Movie collections, Plex often gets confused when TV Shows are put in nested directories.
-
 #### TV Show Example:
 ```
 Avatar The Last Airbender
