@@ -5,7 +5,7 @@ Data Driven Collections is a tool that builds and applies Plex collections, post
 
 A big part of building and maintaining a Plex server is the satisfaction of having it nicely organized with collections and custom poster artwork. Using Plex's web client to do all this organization is convenient, but all this time and effort is lost when a server needs to be migrated or a hardware failure occurs. Plex has loose built-in support for backing this data up, but the recovery process is inconsistent and the backup task is unreliably at best. More importantly, this organization exists on a Plex server, *not* through the arrangement of media on disk.
 
-Data Driven Collections is no more than a script that looks at the file structure your media is organized in and builds collections / applies poster artwork in Plex accordingly. **The main benefits of this organizing your media this way are**: 
+Data Driven Collections is no more than a script that looks at the file structure your media is organized in and builds collections / applies poster artwork in Plex accordingly. **The main benefits of organizing media this way are**: 
 * Collection/artwork organization data isn't lost when migrating a plex server to new hardware or after a failure, as long as the original media is sufficiently backed up, all that's needed after setting up a new server is to run the script again.
 * Since this collection/artwork organization exists outside of Plex, it's easy to move to a new media server host platform with all your library organization intact.
 
