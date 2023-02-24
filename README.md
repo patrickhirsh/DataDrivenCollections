@@ -116,6 +116,7 @@ This script can be configured either through a ```DataDrivenCollections.ini``` f
 * ```py DataDriveCollections.py --library "TV Shows" -c 1 -t MYPLEXAPITOKEN```
 
 ### .ini Examples:
+DataDrivenCollections.ini:
 ```
 [Auth]
 server_url=http://192.168.1.1:32400
@@ -126,6 +127,7 @@ artwork=artwork
 collection_priority=0
 ```
 
+DataDrivenCollections.ini:
 ```
 [Auth]
 server_name=My Plex Server
