@@ -112,7 +112,7 @@ This script can be configured either through a ```DataDrivenCollections.ini``` f
 |Server Name|Plex server name for token auth|```-n```, ```--server-name```, ```--server_name```|```server_name```|Auth|
 
 ### Command Examples:
-* ```py DataDriveCollections.py -l Movies --artwork poster --user MYPLEXUSER --pass MYPLEXPASS --server-name MYPLEXSERVERNAME```
+* ```py DataDriveCollections.py -l Movies --user MYPLEXUSER --pass MYPLEXPASS --server-name MYPLEXSERVERNAME```
 * ```py DataDriveCollections.py --library "TV Shows" -c 1 -t MYPLEXAPITOKEN```
 
 ### .ini Examples:
