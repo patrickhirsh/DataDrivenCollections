@@ -68,55 +68,58 @@ parser.add_argument("-v", "--verbose",
 args = parser.parse_args()
 
 # read config data - command line takes priority over .ini
-config = configparser.ConfigParser()
-config.read("DataDrivenCollections.ini")
+has_config = False
+if os.path.exists("DataDrivenCollections.ini"):
+    config = configparser.ConfigParser()
+    config.read("DataDrivenCollections.ini")
+    has_config = True
 
 # [Auth]
 username = None
-if "username" in config["Auth"]:
+if has_config and "username" in config["Auth"]:
     username = config["Auth"]["username"]
 if args.user != "":
     username = args.user
 
 password = None
-if "password" in config["Auth"]:
+if has_config and "password" in config["Auth"]:
     password = config["Auth"]["password"]
 if args.password != "":
     password = args.password
 
 token = None
-if "token" in config["Auth"]:
+if has_config and "token" in config["Auth"]:
     token = config["Auth"]["token"]
 if args.token != "":
     token = args.token
 
 server_url = None
-if "server_url" in config["Auth"]:
+if has_config and "server_url" in config["Auth"]:
     server_url =  config["Auth"]["server_url"]
 if args.server_url != "":
     server_url = args.server_url
 
 server_name = None
-if "server_name" in config["Auth"]:
+if has_config and "server_name" in config["Auth"]:
     server_name =  config["Auth"]["server_name"]
 if args.server_name != "":
     server_name = args.server_name
 
 # [Config]
-library = None:
-if "library" in config["Config"]:
+library = None
+if has_config and "library" in config["Config"]:
     library = config["Config"]["library"]
 if args.library != "":
     library = args.library
 
 artwork_filename = "artwork"
-if "artwork" in config["Config"]:
+if has_config and "artwork" in config["Config"]:
     artwork_filename = config["Config"]["artwork"]
 if args.artwork != "":
     artwork_filename = args.artwork
 
 collection_priority = "collection_priority"
-if "collection_priority" in config["Config"]:
+if has_config and "collection_priority" in config["Config"]:
     if config["Config"]["collection_priority"] == "1":
         collection_priority = True
 if args.collection_priority:
