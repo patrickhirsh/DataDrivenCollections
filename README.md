@@ -10,7 +10,7 @@ Data Driven Collections is no more than a script that looks at the file structur
 * Since this collection/artwork organization exists outside of Plex, it's easy to move to a new media server host platform with all your library organization intact.
 
 ## How does it work?
-Data Driven Collections uses a simple set of rules to interpret how to translate the organization of Plex media on-disk into Plex collections and artwork. Running the tool scans the library's media directory and automatically translates the way it's organized into Plex collections, poster artwork, and metadata. 
+Data Driven Collections uses a simple set of rules to interpret how to translate the organization of Plex media on-disk into Plex collections and artwork. Running the tool scans the library's media directory and automatically translates filestructure organization into Plex collections, poster artwork, and metadata. 
 
 **The Data Driven Collections tool follows these rules:**
 * Each movie file should be in its own folder.
