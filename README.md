@@ -104,7 +104,8 @@ This script can be configured either through a ```DataDrivenCollections.ini``` f
 |---|---|---|---|---|
 |Library (required) |name of the Plex library to update|```-l```, ```--library```|```library```|Config|
 |Artwork|files matching this name will be used as poster art (default: ```artwork```)|```-a```, ```--artwork```|```artwork```|Config|
-|Collection Priority|if ```1```, all collections will sort to the top of the library (default: ```0```)|```-c```, ```--collection-priority```, ```--collection_priority```|```collection_priority```|Config|
+|Collection Priority|if ```1```, all collections will sort to the top of the library (default: ```0```)|```--collection-priority```, ```--collection_priority```|```collection_priority```|Config|
+|Collection Grouping|if ```1```, sub-directories within a collection will create sort groups to group media (default: ```0```)|```--collection-grouping```, ```--collection_grouping```|```collection_grouping```|Config|
 |Username|Plex account username for basic auth|```-u```, ```--user```, ```--username```|```username```|Auth|
 |Password|Plex account password for basic auth|```-p```, ```--pass```, ```--password```|```password```|Auth|
 |X-Plex-Token|Plex API token for token auth|```-t```, ```--token```|```token```|Auth|

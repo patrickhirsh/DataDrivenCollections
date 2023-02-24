@@ -56,9 +56,14 @@ parser.add_argument("-a", "--artwork-filename", "--artwork_filename",
                     dest="artwork",
                     help="filename to match when looking for poster artwork adjacent to Plex media",
                     default="")
-parser.add_argument("-c", "--collection-priority", "--collection_priority",
+parser.add_argument("--collection-priority", "--collection_priority",
                     dest="collection_priority",
                     help="put all collections at the top of the sort order",
+                    action='store_true',
+                    default=False)
+parser.add_argument("--collection-grouping", "--collection_grouping",
+                    dest="collection_grouping",
+                    help="sub-directories within a collection will create sort groups to group media",
                     action='store_true',
                     default=False)
 parser.add_argument("-v", "--verbose",
@@ -124,6 +129,13 @@ if has_config and "collection_priority" in config["Config"]:
         collection_priority = True
 if args.collection_priority:
     collection_priority = True
+
+collection_grouping = "collection_grouping"
+if has_config and "collection_grouping" in config["Config"]:
+    if config["Config"]["collection_grouping"] == "1":
+        collection_grouping = True
+if args.collection_grouping:
+    collection_grouping = True
 
 if not library:
     print("Error: must provide a Plex library name")
@@ -286,6 +298,25 @@ def update_plex_movie_library(server, section, roots):
                     if entry.path in plex_media_dir_to_movie and not is_root:
                         entries.append(entry)
                     return entries
+
+                # collection grouping takes grouped sub entries and manipulates their sort order to organize them together in the collection
+                if collection_grouping:
+                    collection_sort_index = 0
+                    for sub_entry in entry.sub_entries:
+                        if sub_entry not in plex_media_dir_to_movie:
+                            mapped_sub_entries = [plex_media_dir_to_movie[i.path] for i in find_mapped_entries_recursive(sub_entry)]
+                            if len(mapped_sub_entries) > 0:
+                                print(f"grouping {str(len(mapped_sub_entries))} movies together within collection {entry.name}")
+
+                                # within the grouping, sort by movie release year
+                                collection_group_sort_index = 0
+                                mapped_sub_entries.sort(key=lambda e : e.year)
+                                for movie in mapped_sub_entries:
+                                    print(f"    * {movie.title}")
+                                    movie.editSortTitle(f"_{str(collection_sort_index)}{str(collection_group_sort_index)}{movie.title}")
+                                    collection_group_sort_index += 1
+                                collection_sort_index += 1 
+
                 mapped_entries = find_mapped_entries_recursive(entry)
 
                 # if a top-level entry has any mapped sub-entries (at any depth), build a collection
