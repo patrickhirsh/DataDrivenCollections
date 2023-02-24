@@ -1,5 +1,6 @@
 # Data Driven Collections - Patrick Hirsh (February 2023)
 try:
+    import time
     import os
     import ntpath
     import argparse
@@ -59,13 +60,15 @@ parser.add_argument("-a", "--artwork-filename", "--artwork_filename",
 parser.add_argument("--collection-priority", "--collection_priority",
                     dest="collection_priority",
                     help="put all collections at the top of the sort order",
-                    action='store_true',
-                    default=False)
+                    action='store_true')
 parser.add_argument("--collection-grouping", "--collection_grouping",
                     dest="collection_grouping",
                     help="sub-directories within a collection will create sort groups to group media",
-                    action='store_true',
-                    default=False)
+                    action='store_true')
+parser.add_argument("--collection-mode", "--collection_mode",
+                    dest="collection_mode",
+                    help="'default' (library default), 'hide' (hide collections), 'hideItems' (hide Items in collections), 'showItems' (show collections and their items)",
+                    default="")
 parser.add_argument("-v", "--verbose",
                     help="verbose logging",
                     action='store_true',
@@ -123,23 +126,37 @@ if has_config and "artwork" in config["Config"]:
 if args.artwork != "":
     artwork_filename = args.artwork
 
-collection_priority = "collection_priority"
+collection_priority = False
 if has_config and "collection_priority" in config["Config"]:
     if config["Config"]["collection_priority"] == "1":
         collection_priority = True
 if args.collection_priority:
     collection_priority = True
 
-collection_grouping = "collection_grouping"
+collection_grouping = False
 if has_config and "collection_grouping" in config["Config"]:
     if config["Config"]["collection_grouping"] == "1":
         collection_grouping = True
 if args.collection_grouping:
     collection_grouping = True
 
+collection_mode = "default"
+if has_config and "collection_mode" in config["Config"]:
+    collection_mode = config["Config"]["collection_mode"]
+if args.collection_mode:
+    collection_mode = args.collection_mode
+
 if not library:
     print("Error: must provide a Plex library name")
     exit(1)
+
+print("============ DataDrivenCollections ============")
+print(f"library:                {library}")
+print(f"artwork filename:       {artwork_filename}")
+print(f"collection priority:    {collection_priority}")
+print(f"collection grouping:    {collection_grouping}")
+print(f"collection mode:        {collection_mode}")
+print("===============================================")
 
 # connect to Plex
 server = None
@@ -298,25 +315,6 @@ def update_plex_movie_library(server, section, roots):
                     if entry.path in plex_media_dir_to_movie and not is_root:
                         entries.append(entry)
                     return entries
-
-                # collection grouping takes grouped sub entries and manipulates their sort order to organize them together in the collection
-                if collection_grouping:
-                    collection_sort_index = 0
-                    for sub_entry in entry.sub_entries:
-                        if sub_entry not in plex_media_dir_to_movie:
-                            mapped_sub_entries = [plex_media_dir_to_movie[i.path] for i in find_mapped_entries_recursive(sub_entry)]
-                            if len(mapped_sub_entries) > 0:
-                                print(f"grouping {str(len(mapped_sub_entries))} movies together within collection {entry.name}")
-
-                                # within the grouping, sort by movie release year
-                                collection_group_sort_index = 0
-                                mapped_sub_entries.sort(key=lambda e : e.year)
-                                for movie in mapped_sub_entries:
-                                    print(f"    * {movie.title}")
-                                    movie.editSortTitle(f"_{str(collection_sort_index)}{str(collection_group_sort_index)}{movie.title}")
-                                    collection_group_sort_index += 1
-                                collection_sort_index += 1 
-
                 mapped_entries = find_mapped_entries_recursive(entry)
 
                 # if a top-level entry has any mapped sub-entries (at any depth), build a collection
@@ -343,6 +341,33 @@ def update_plex_movie_library(server, section, roots):
                     if entry.artwork:
                         collection.uploadPoster(url=None, filepath=entry.artwork)
                         print(f"applied artwork '{entry.artwork}' to poster for collection '{collection.title}'")
+                    
+                    # collection grouping takes grouped sub entries and manipulates their sort order to organize them together in the collection
+                    if collection_grouping:
+                        collection_sort_index = 0
+                        for sub_entry in entry.sub_entries:
+                            if sub_entry not in plex_media_dir_to_movie:
+                                mapped_sub_entries = [plex_media_dir_to_movie[i.path] for i in find_mapped_entries_recursive(sub_entry)]
+                                if len(mapped_sub_entries) > 0:
+                                    print(f"grouping {str(len(mapped_sub_entries))} movies together within collection {entry.name}")
+
+                                    # within the grouping, sort by movie release year
+                                    collection_group_sort_index = 0
+                                    mapped_sub_entries.sort(key=lambda e : e.year)
+                                    for movie in mapped_sub_entries:
+                                        print(f"    * {movie.title}")
+                                        movie.editSortTitle(f"_{str(collection_sort_index)}{str(collection_group_sort_index)}{movie.title}")
+                                        collection_group_sort_index += 1
+                                    collection_sort_index += 1
+                        
+                        # collection grouping relies on alpha sort order to sort properly
+                        collection.sortUpdate("alpha")
+
+                    # apply collection mode
+                    print(f"applying collection mode '{collection_mode}' to collection '{entry.name}'", flush=True)
+                    collection.modeUpdate("default")
+                    time.sleep(0.2)   # without this Plex can get in a bad state trying to update entries. Slow request rate to let it catch up
+                    collection.modeUpdate(collection_mode)
 
     # dump tree state if logging is set to verbose
     if args.verbose:
@@ -564,6 +589,33 @@ def update_plex_show_library(server, section, roots):
                     if entry.artwork:
                         collection.uploadPoster(url=None, filepath=entry.artwork)
                         print(f"applied artwork '{entry.artwork}' to poster for collection '{collection.title}'")
+
+                    # collection grouping takes grouped sub entries and manipulates their sort order to organize them together in the collection
+                    if collection_grouping:
+                        collection_sort_index = 0
+                        for sub_entry in entry.sub_entries:
+                            if sub_entry not in plex_media_dir_to_show:
+                                mapped_sub_entries = [plex_media_dir_to_show[i.path] for i in find_mapped_entries_recursive(sub_entry, plex_media_dir_to_show)]
+                                if len(mapped_sub_entries) > 0:
+                                    print(f"grouping {str(len(mapped_sub_entries))} shows together within collection {entry.name}")
+
+                                    # within the grouping, sort by movie release year
+                                    collection_group_sort_index = 0
+                                    mapped_sub_entries.sort(key=lambda e : e.year)
+                                    for show in mapped_sub_entries:
+                                        print(f"    * {show.title}")
+                                        show.editSortTitle(f"_{str(collection_sort_index)}{str(collection_group_sort_index)}{show.title}")
+                                        collection_group_sort_index += 1
+                                    collection_sort_index += 1
+                        
+                        # collection grouping relies on alpha sort order to sort properly
+                        collection.sortUpdate("alpha")
+                    
+                    # apply collection mode
+                    print(f"applying collection mode '{collection_mode}' to collection '{entry.name}'", flush=True)
+                    collection.modeUpdate("default")
+                    time.sleep(0.2)   # without this Plex can get in a bad state trying to update entries. Slow request rate to let it catch up
+                    collection.modeUpdate(collection_mode)
                 
                 # if none of the sub-entries are mapped shows, but this directory is mapped, treat this like a show entry
                 elif entry.path in plex_media_dir_to_show:
@@ -628,6 +680,9 @@ if args.collection_priority:
     print("updating sort titles to prioritize collections")
     for collection in section.collections():
         collection.editSortTitle(f"_{collection.title}")
+
+for hub in server.library.hubs():
+    hub.reload()
         
 print("Done.")
 

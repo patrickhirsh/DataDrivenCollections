@@ -106,6 +106,7 @@ This script can be configured either through a ```DataDrivenCollections.ini``` f
 |Artwork|files matching this name will be used as poster art (default: ```artwork```)|```-a```, ```--artwork```|```artwork```|Config|
 |Collection Priority|if ```1```, all collections will sort to the top of the library (default: ```0```)|```--collection-priority```, ```--collection_priority```|```collection_priority```|Config|
 |Collection Grouping|if ```1```, sub-directories within a collection will create sort groups to group media (default: ```0```)|```--collection-grouping```, ```--collection_grouping```|```collection_grouping```|Config|
+|Collection Mode|```default``` (library default), ```hide``` (hide collections), ```hideItems``` (hide Items in collections), ```showItems``` (show collections and their items))|```--collection-mode```, ```--collection_mode```|```collection_mode```|Config|
 |Username|Plex account username for basic auth|```-u```, ```--user```, ```--username```|```username```|Auth|
 |Password|Plex account password for basic auth|```-p```, ```--pass```, ```--password```|```password```|Auth|
 |X-Plex-Token|Plex API token for token auth|```-t```, ```--token```|```token```|Auth|
