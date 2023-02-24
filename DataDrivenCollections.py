@@ -66,9 +66,6 @@ parser.add_argument("-v", "--verbose",
                     action='store_true',
                     default=False)
 args = parser.parse_args()
-if args.library == "":
-    print("Error: please provide a valid Plex library name")
-    exit(1)
 
 # read config data - command line takes priority over .ini
 config = configparser.ConfigParser()
@@ -106,6 +103,12 @@ if args.server_name != "":
     server_name = args.server_name
 
 # [Config]
+library = None:
+if "library" in config["Config"]:
+    library = config["Config"]["library"]
+if args.library != "":
+    library = args.library
+
 artwork_filename = "artwork"
 if "artwork" in config["Config"]:
     artwork_filename = config["Config"]["artwork"]
@@ -118,6 +121,10 @@ if "collection_priority" in config["Config"]:
         collection_priority = True
 if args.collection_priority:
     collection_priority = True
+
+if not library:
+    print("Error: must provide a Plex library name")
+    exit(1)
 
 # connect to Plex
 server = None
@@ -566,12 +573,12 @@ def update_plex_show_library(server, section, roots):
             root.print([plex_media_dir_to_show, plex_media_dir_to_season])
 
 # connect to plex and gather lib info
-section = server.library.section(args.library)
+section = server.library.section(library)
 
 # construct an entry tree for each physical disk location that makes up the section
 roots = []
 for location in section.locations:
-    print(f"building entry tree for section '{args.library}' location '{location}'...")
+    print(f"building entry tree for section '{library}' location '{location}'...")
     roots.append(build_entry_tree(location))
 
 # update plex with metadata based on the entry trees constructed above

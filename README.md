@@ -88,3 +88,50 @@ Would produce a collection called "Shows About Horses" containing both "Bojack H
 The show poster for "Avatar The Last Airbender" would have the "artwork.png" file located at "Avatar The Last Airbender/artwork.png" applied. The "artwork.png" in its first season folder would be applied to the Season 1 poster. "Bojack Horseman" would only have artwork applied to its Season 2 poster, but "Free Rein" would have corresponding artwork.png files applied to both its main show poster and Season 1 poster.
 
 TV Show media merging rules are slightly different in that the tool will *not* attempt to merge any media. If Plex has auto-merged two versions of a show on import (say, an HD version and a lower quality SD version to save on transcoding) this tool will split these into two separate shows *only if the media files for these are not in the same folders*. Otherwise, it'll do nothing.
+
+## Usage
+Anytime DataDrivenCollections.py is ran, the structure of that library's media directory is propogated into Plex. This script will never remove collections / poster artwork, only add them - meaning if changes are made to a library that remove collections or artwork, it's best to just delete the library in Plex, re-add it, then run the script.
+
+1. Install [Python 3](https://www.python.org/downloads/)
+2. Install required packages with pip by running: ```pip install -r requirements.txt``` from within the project directory
+3. Provide a form of server authentication via the .ini file or command line arguments (more info on .ini and command line arguments below)
+    * **Basic Auth:** supply a Plex **username/password** and a **Plex server name**
+    * **Token Auth:** supply an **[X-Plex-Token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)** and a **Plex server URL**
+4. Run DataDrivenCollections.py on a Plex library at any time to update its collections and poster artwork!
+
+This script can be configured either through a ```DataDrivenCollections.ini``` file placed in the project directory, or via commandline arguments. Below are the various configuration options for DataDrivenCollections:
+|Option|Description|Command Line Aliases|.ini Alias|.ini Section|
+|---|---|---|---|---|
+|Library (required) |name of the Plex library to update|```-l```, ```--library```|```library```|Config|
+|Artwork|files matching this name will be used as poster art (default: ```artwork```)|```-a```, ```--artwork```|```artwork```|Config|
+|Collection Priority|if ```1```, all collections will sort to the top of the library (default: ```0```)|```-c```, ```--collection-priority```, ```--collection_priority```|```collection_priority```|Config|
+|Username|Plex account username for basic auth|```-u```, ```--user```, ```--username```|```username```|Auth|
+|Password|Plex account password for basic auth|```-p```, ```--pass```, ```--password```|```password```|Auth|
+|X-Plex-Token|Plex API token for token auth|```-t```, ```--token```|```token```|Auth|
+|Server URL|Plex server url for token auth|```-s```, ```--server-url```, ```--server_url```|```server_url```|Auth|
+|Server Name|Plex server name for token auth|```-n```, ```--server-name```, ```--server_name```|```server_name```|Auth|
+
+### Command Examples:
+```py DataDriveCollections.py -l Movies --artwork poster --user MYPLEXUSER --pass MYPLEXPASS --server-name MYPLEXSERVERNAME```
+```py DataDriveCollections.py --library "TV Shows" -c 1 -t MYPLEXAPITOKEN```
+
+### .ini Examples:
+```
+[Auth]
+server_url=http://192.168.1.1:32400
+token=gTo557jqjty2EWmcYUOp
+
+[Config]
+artwork=artwork
+collection_priority=0
+```
+
+```
+[Auth]
+server_name=My Plex Server
+username=myplexuser@gmail.com
+password=myplexpassword
+
+[Config]
+artwork=art
+```
