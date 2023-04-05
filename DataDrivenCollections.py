@@ -345,10 +345,12 @@ def update_plex_movie_library(server, section, roots):
                     # collection grouping takes grouped sub entries and manipulates their sort order to organize them together in the collection
                     if collection_grouping:
                         collection_sort_index = 0
+                        has_collection_groups = False
                         for sub_entry in entry.sub_entries:
                             if sub_entry not in plex_media_dir_to_movie:
                                 mapped_sub_entries = [plex_media_dir_to_movie[i.path] for i in find_mapped_entries_recursive(sub_entry)]
                                 if len(mapped_sub_entries) > 0:
+                                    has_collection_groups = True
                                     print(f"grouping {str(len(mapped_sub_entries))} movies together within collection {entry.name}")
 
                                     # within the grouping, sort by movie release year
@@ -361,7 +363,10 @@ def update_plex_movie_library(server, section, roots):
                                     collection_sort_index += 1
                         
                         # collection grouping relies on alpha sort order to sort properly
-                        collection.sortUpdate("alpha")
+                        if has_collection_groups:
+                            collection.sortUpdate("alpha")
+                        else:
+                            collection.sortUpdate("release")
 
                     # apply collection mode
                     print(f"applying collection mode '{collection_mode}' to collection '{entry.name}'", flush=True)
