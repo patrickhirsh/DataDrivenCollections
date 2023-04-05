@@ -138,4 +138,6 @@ password=myplexpassword
 
 [Config]
 artwork=art
+collection_grouping=1
+collection_mode=hideItems
 ```
