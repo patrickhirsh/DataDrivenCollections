@@ -1,5 +1,5 @@
 # Data Driven Collections for Plex
-Data Driven Collections is a tool that builds and applies Plex collections, poster artwork, and other metadata to Plex libraries automatically based on the file structure of the original media on disk. 
+Data Driven Collections is a tool that builds and applies collections, poster artwork, and other metadata to Plex libraries automatically based on the file structure of the original media on disk. 
 
 ## Why Data Driven Collections?
 
